@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,11 +9,12 @@ const OUTPUT_FILE = 'v2ex-hot.json';
 export async function runOnce({
   fetchImpl = fetch,
   outputPath = path.resolve(process.cwd(), OUTPUT_FILE),
-  timeoutMs = REQUEST_TIMEOUT_MS,
+  timeoutMs = Number(process.env.V2EX_HOT_TIMEOUT_MS ?? REQUEST_TIMEOUT_MS),
   logger = console.error,
 } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(new Error('Request timed out')), timeoutMs);
+  const tempPath = `${outputPath}.${process.pid}.tmp`;
 
   try {
     const response = await fetchImpl(HOT_TOPICS_URL, { signal: controller.signal });
@@ -26,13 +27,15 @@ export async function runOnce({
       throw new Error('V2EX API did not return at least 10 topics');
     }
 
-    await writeFile(outputPath, `${JSON.stringify(topics.slice(0, 10), null, 2)}\n`, 'utf8');
+    await writeFile(tempPath, `${JSON.stringify(topics.slice(0, 10), null, 2)}\n`, 'utf8');
+    await rename(tempPath, outputPath);
     return 0;
   } catch (error) {
     logger(`Failed to fetch V2EX hot topics: ${error.message}`);
     return 1;
   } finally {
     clearTimeout(timeout);
+    await rm(tempPath, { force: true }).catch(() => {});
   }
 }
 
