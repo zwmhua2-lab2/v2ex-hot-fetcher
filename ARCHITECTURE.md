@@ -16,7 +16,7 @@
 - **C2 失败不污染**：先向输出目录中的临时文件写入完整 JSON，再 `rename` 为 `tasks.json`；失败时不覆盖原有 `tasks.json`，尽力清理临时文件。**防的失败**：写到一半破坏上次结果。**验证**：测试写入/替换失败后原文件字节不变。
 - **C3 对外结果有限且明确**：成功 → 退出码 `0`，输出合法 JSON 数组 `tasks.json`；输入错误 → 退出码 `1`、stderr 为 `DATA_ERROR`；输出错误 → 退出码 `1`、stderr 为 `OUTPUT_ERROR`。错误时不输出堆栈，不写误导性的成功结果。**防的失败**：错误行为不确定。**验证**：测试三类结果的退出码、stderr 和文件内容。
 - **C4 密钥最小暴露**：当前功能不需要密钥；禁止增加硬编码密钥或在日志中输出数据全文。**防的失败**：意外泄露凭证或输入内容。**验证**：扫描代码与终审清单。
-- **C5 红牌文件**：`.github/**`、`package.json`、各类 lockfile 和测试配置文件如 `vitest.config.*`、`jest.config.*`、`playwright.config.*` 不得在普通功能 PR 中修改；确需修改则独立 Issue，由 Human 单独审查。**防的失败**：顺手改 CI、依赖或测试门禁。**验证**：终审清单检查 Files changed。
+-- **C5 红牌文件**：修改 `.github/**`、`package.json`、各类 lockfile、`AGENTS.md`、`ARCHITECTURE.md` 必须独立建 Issue，由 Human 亲自审查。
 
 ## 3. 模式库
 - **无**：当前是单次本地文件处理，不存在对外服务、实时性、限流上游或 LLM；P1–P5 暂不适用。
