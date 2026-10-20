@@ -3,6 +3,8 @@ import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+const invokedPath = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href;
+const isCliInvocation = invokedPath === import.meta.url;
 const defaultFs = { readFileSync, renameSync, unlinkSync, writeFileSync };
 
 export function run({ cwd = process.cwd(), fs = defaultFs } = {}) {
@@ -10,8 +12,12 @@ export function run({ cwd = process.cwd(), fs = defaultFs } = {}) {
   try {
     const source = fs.readFileSync(resolve(cwd, "data.json"), "utf8");
     items = JSON.parse(source);
-    if (!Array.isArray(items)) return { exitCode: 1, stderr: "DATA_ERROR\n" };
+    if (!Array.isArray(items)) throw new Error("Input must be a JSON array");
   } catch {
+    if (isCliInvocation) {
+      process.stderr.write("DATA_ERROR\n");
+      process.exit(1);
+    }
     return { exitCode: 1, stderr: "DATA_ERROR\n" };
   }
 
@@ -27,9 +33,10 @@ export function run({ cwd = process.cwd(), fs = defaultFs } = {}) {
     )
     .map(({ id, title }) => ({ id, title }));
 
-  const outputPath = resolve(cwd, "tasks.json");
+  let outputPath;
   let temporaryPath;
   try {
+    outputPath = resolve(cwd, "tasks.json");
     temporaryPath = resolve(cwd, `tasks.json.tmp-${randomUUID()}`);
     fs.writeFileSync(temporaryPath, `${JSON.stringify(tasks, null, 2)}\n`, { flag: "wx" });
     fs.renameSync(temporaryPath, outputPath);
@@ -42,13 +49,15 @@ export function run({ cwd = process.cwd(), fs = defaultFs } = {}) {
         // Cleanup is best effort; the original tasks.json remains untouched.
       }
     }
+    if (isCliInvocation) {
+      process.stderr.write("OUTPUT_ERROR\n");
+      process.exit(1);
+    }
     return { exitCode: 1, stderr: "OUTPUT_ERROR\n" };
   }
 }
 
-const invokedPath = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href;
-if (invokedPath === import.meta.url) {
+if (isCliInvocation) {
   const result = run();
-  if (result.stderr) process.stderr.write(result.stderr);
   process.exitCode = result.exitCode;
 }

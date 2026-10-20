@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -119,6 +120,24 @@ test("Given injected temporary-write or rename failure, When run, Then OUTPUT_ER
       assert.deepEqual(readdirSync(directory).sort(), ["data.json", "tasks.json"], failure);
     });
   }
+});
+
+test("Given an unreplaceable tasks.json destination, When launched as a child process, Then OUTPUT_ERROR exits with code 1", () => {
+  // Given 输入有效且 `tasks.json` 是含有标记文件的目录，When 通过 child_process 执行脚本并触发 rename 失败，Then 真实进程退出码为 `1`、stderr 精确为 `OUTPUT_ERROR\n`，且临时文件已清理。
+  withTempDirectory((directory) => {
+    writeFileSync(join(directory, "data.json"), '[{"type":"task","id":1,"title":"A"}]');
+    mkdirSync(join(directory, "tasks.json"));
+    writeFileSync(join(directory, "tasks.json", "existing.marker"), "keep");
+
+    const result = execute(directory);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, "OUTPUT_ERROR\n");
+    assert.equal(result.stdout, "");
+    assert.equal(readFileSync(join(directory, "tasks.json", "existing.marker"), "utf8"), "keep");
+    assert.deepEqual(readdirSync(directory).sort(), ["data.json", "tasks.json"]);
+    assert.deepEqual(readdirSync(join(directory, "tasks.json")), ["existing.marker"]);
+  });
 });
 
 test("Given the production script, When checking its source, Then it uses no network, subprocess, or third-party package", () => {
